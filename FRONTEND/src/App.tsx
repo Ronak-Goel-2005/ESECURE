@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 
+const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || "http://127.0.0.1:5000";
+const PUBLIC_TOKEN = (import.meta as any).env?.VITE_PUBLIC_TOKEN || "your_public_token";
+
 const App: React.FC = () => {
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -16,28 +19,40 @@ const App: React.FC = () => {
     setScore(null);
 
     try {
-      const res = await fetch("/analyze_terms", {
+      const res = await fetch(`${BACKEND_URL}/analyze_terms`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Access-Token": "your_public_token",
+          "X-Access-Token": PUBLIC_TOKEN,
         },
         body: JSON.stringify({ text }),
       });
 
-      const data = await res.json();
+      const ct = res.headers.get("content-type") || "";
+      let data: any = {};
+
+      if (ct.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = { error: `Invalid JSON response (status ${res.status})` };
+        }
+      } else {
+        const textBody = await res.text();
+        data = { error: `Unexpected response content-type (${ct})`, body: textBody };
+      }
 
       if (res.ok) {
         setFeedback(data.feedback || "No feedback returned");
         setScore(data.score ?? null);
       } else {
-        setError(data.error || "Something went wrong");
+        setError(data.error || `Request failed: ${res.status}`);
       }
     } catch (err) {
       setError("Network error");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

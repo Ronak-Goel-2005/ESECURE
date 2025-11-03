@@ -8,21 +8,27 @@ import re
 
 app = Flask(__name__)
 CORS(app)
-limiter = Limiter(get_remote_address, app=app, default_limits=["5 per minute"])
+limiter = Limiter(app, key_func=get_remote_address, default_limits=["5 per minute"])
 
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
+def auth_disabled():
+    return os.environ.get("DISABLE_AUTH", "false").lower() in ("1", "true", "yes")
+
 @app.before_request
 def check_token():
+    if auth_disabled():
+        return None
     token = request.headers.get("X-Access-Token")
-    if token != os.environ.get("MY_PUBLIC_TOKEN"):
+    expected = os.environ.get("MY_PUBLIC_TOKEN", "")
+    if not expected or token != expected:
         return jsonify({"error": "Unauthorized"}), 401
 
 @app.route("/analyze_terms", methods=["POST"])
 @limiter.limit("5 per minute")
 def analyze_terms():
-    data = request.get_json()
-    text = data.get("text", "")
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "") if isinstance(data, dict) else ""
 
     if not text.strip():
         return jsonify({"error": "No text provided"}), 400
@@ -40,19 +46,15 @@ def analyze_terms():
     try:
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
-        result_text = response.text.strip()
+        result_text = (response.text or "").strip()
 
-        # 🔹 Extract numeric score if present
-        score_match = re.search(r"score\s*[:=]\s*(\d+)", result_text, re.IGNORECASE)
+        score_match = re.search(r"(?:score|safety score)\s*[:=]?\s*(\d{1,3})", result_text, re.IGNORECASE)
         score = int(score_match.group(1)) if score_match else None
 
-        return jsonify({
-            "score": score,
-            "feedback": result_text
-        })
+        return jsonify({"score": score, "feedback": result_text}), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "AI backend error", "detail": str(e)}), 502
 
 @app.route("/", methods=["GET"])
 def home():
@@ -64,4 +66,6 @@ def home():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    debug_mode = os.environ.get("FLASK_DEBUG", "true").lower() in ("1", "true", "yes")
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
