@@ -27,10 +27,14 @@ def auth_disabled():
 def check_token():
     if auth_disabled():
         return None
+    # Allow preflight OPTIONS request
+    if request.method == "OPTIONS":
+        return None
     token = request.headers.get("X-Access-Token")
     expected = os.environ.get("MY_PUBLIC_TOKEN", "")
     if not expected or token != expected:
         return jsonify({"error": "Unauthorized"}), 401
+
 
 
 @app.route("/analyze_terms", methods=["POST"])

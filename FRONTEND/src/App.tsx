@@ -3,12 +3,27 @@ import React, { useState } from "react";
 const BACKEND_URL = (import.meta as any).env?.VITE_BACKEND_URL || "http://127.0.0.1:5000";
 const PUBLIC_TOKEN = (import.meta as any).env?.VITE_PUBLIC_TOKEN || "your_public_token";
 
+
+console.log("BACKEND_URL:", BACKEND_URL);
+console.log("PUBLIC_TOKEN:", PUBLIC_TOKEN);
+
 const App: React.FC = () => {
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState("");
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const boxStyle: React.CSSProperties = {
+  width: "100%",
+  padding: 15,
+  fontSize: 16,
+  borderRadius: 8,
+  border: "1px solid #ccc",
+  background: "#f0f8ff", 
+  color: "#000", 
+  marginTop: 20,
+  whiteSpace: "pre-wrap",
+};
 
   const handleAnalyze = async () => {
     if (!text.trim()) return alert("Please enter terms and conditions text.");
@@ -60,12 +75,13 @@ const App: React.FC = () => {
       <h1>ESECURE Terms Analyzer</h1>
 
       <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Paste terms & conditions here..."
-        rows={10}
-        style={{ width: "100%", padding: 10, fontSize: 16 }}
-      />
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      placeholder="Paste terms & conditions here..."
+      rows={10}
+      style={boxStyle} 
+    />
+
 
       <button
         onClick={handleAnalyze}
@@ -75,8 +91,8 @@ const App: React.FC = () => {
         {loading ? "Analyzing..." : "Analyze"}
       </button>
 
-      {feedback && (
-        <div style={{ marginTop: 20, padding: 10, background: "#e0ffe0" }}>
+       {feedback && (
+        <div style={boxStyle}>
           <h3>Safety Score: {score !== null ? score : "N/A"}/100</h3>
           <h3>Feedback:</h3>
           <p>{feedback}</p>
