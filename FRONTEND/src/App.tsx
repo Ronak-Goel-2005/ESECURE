@@ -19,17 +19,23 @@ const App: React.FC = () => {
   // 🔍 Auto-detect current tab URL (for Chrome Extension)
 const handleFetchActiveTab = async () => {
   try {
-    if (typeof chrome !== "undefined" && chrome.tabs) {
+    if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab && tab.url) setUrl(tab.url);
+      if (tab && tab.url) {
+        setUrl(tab.url);
+        setError("");
+      } else {
+        setError("No active tab detected.");
+      }
     } else {
-      setError("Chrome API not available — try running as extension.");
+      setError("Chrome API not available — open from extension popup.");
     }
   } catch (err) {
-    console.error("Failed to fetch tab:", err);``
-    setError("Unable to access current tab URL.");
+    console.error("Tab fetch failed:", err);
+    setError("Unable to fetch current tab URL.");
   }
 };
+
 
 //  what is inside the text area and url input
 const handleAnalyze = async () => {

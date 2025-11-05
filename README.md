@@ -75,3 +75,25 @@ npm run dev
 * Click Analyze.
 
 * View the generated safety score, summary, and clause feedback
+
+## Load & Test Extension
+
+Now:
+```bash
+>> Run the backend:
+
+python main.py
+
+
+>> Build your frontend:
+
+npm run build
+
+```
+
+Go to Chrome → chrome://extensions/
+→ Enable Developer Mode
+→ Click “Load unpacked”
+→ Select your React dist folder (the build output).
+
+You’ll now see your extension icon — click it!

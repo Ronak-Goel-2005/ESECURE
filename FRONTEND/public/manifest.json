@@ -3,7 +3,16 @@
   "name": "ESECURE Terms Analyzer",
   "description": "Analyze websites' Terms & Conditions and Privacy Policies for safety and risks.",
   "version": "1.0",
-  "permissions": ["tabs", "activeTab", "scripting"],
+  "permissions": ["tabs", "activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://127.0.0.1:5000/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+  "service_worker": "background.js"
+    },
+
   "action": {
     "default_popup": "index.html",
     "default_icon": {
@@ -17,11 +26,8 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "host_permissions": [
-    "http://127.0.0.1:5000/*",
-    "https://*/"
-  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }
+  
 }
