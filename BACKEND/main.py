@@ -23,7 +23,10 @@ limiter = Limiter(
 )
 
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+api_key = os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    raise RuntimeError("GEMINI_API_KEY not set in environment")
+genai.configure(api_key=api_key)
 
 def extract_safety_score(text: str) -> int | None:
     """
@@ -46,7 +49,7 @@ def extract_safety_score(text: str) -> int | None:
 def scrape_terms_from_url(url):
     """Scrape Terms & Conditions or Privacy Policy text from a given URL."""
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}  # ✅ fixed
+        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
@@ -99,17 +102,31 @@ def analyze_terms():
 
     try:
         prompt = f"""
-        You are a legal safety assistant. Analyze the Terms/Privacy Policy text strictly: 
-        1. Give a **safety score from 0 to 100**.  
-        2. Provide a **one-line summary**.  
-        3. List **only risky clauses** (data sharing, refunds, liability, etc.).  
-         
-        Output strictly in this order, in **short and concise format**, without extra commentary.
-        
+You are a legal compliance and risk assistant. You receive the full Terms of Service or Privacy Policy text below.
 
-        Text:
-        {text[:12000]}
-        """
+Strictly follow all instructions and output structure. Do NOT include extra commentary, disclaimers, or formatting beyond what is requested. The output should be concise and easy to understand.
+
+Instructions:
+1. Assign a "Safety Score" from 0 (most risky) to 100 (safest) for this document, based solely on its language and risk exposure.
+- Only output: Safety Score: X/100 (where X is an integer between 0 and 100).
+2. Give a one-line summary (concise, neutral) of overall risk or safety (max 20 words).
+3. List risky or concerning clauses ONLY (such as excessive data sharing, vague liability, hidden fees, broad refunds, forced arbitration, waiver of class action, or similar).
+- Each risky clause must be a bullet point:
+    - Briefly describe the risk.
+    - Quote the relevant policy sentence (if possible), keeping each bullet under 35 words.
+4. Do NOT include any non-risky clauses, general advice, or commentary.
+
+Output in *exactly* this order:
+Safety Score: X/100
+Summary: [your one-line summary]
+Risky Clauses:
+- [bullet 1]
+- [bullet 2]
+- ... (if none, write "None found.")
+
+Text to analyze:
+{text[:12000]}
+"""
 
         model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
