@@ -15,13 +15,32 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=["5 per minute"]
 )
 
+
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+def extract_safety_score(text: str) -> int | None:
+    """
+    Extract a safety score from Gemini response text.
+    Handles any reasonable phrasing.
+    """
+    if not text:
+        return None
+
+    score_match = re.search(r"(?i)(?:safety\s*score|score).{0,20}?(\d{1,3})", text)
+    if score_match:
+        try:
+            score = int(score_match.group(1))
+            return max(0, min(score, 100))  # clamp 0-100
+        except ValueError:
+            return None
+    return None
 
 
 def scrape_terms_from_url(url):
@@ -80,13 +99,13 @@ def analyze_terms():
 
     try:
         prompt = f"""
-        You are a legal safety assistant.
-        Analyze the following Terms & Conditions or Privacy Policy text.
-
-        Tasks:
-        1. Summarize it simply.
-        2. Highlight risky clauses (like data sharing, no refunds, etc.).
-        3. Give a safety score  between 0 (very risky) and 100 (very safe).
+        You are a legal safety assistant. Analyze the Terms/Privacy Policy text strictly: 
+        1. Give a **safety score from 0 to 100**.  
+        2. Provide a **one-line summary**.  
+        3. List **only risky clauses** (data sharing, refunds, liability, etc.).  
+         
+        Output strictly in this order, in **short and concise format**, without extra commentary.
+        
 
         Text:
         {text[:12000]}
