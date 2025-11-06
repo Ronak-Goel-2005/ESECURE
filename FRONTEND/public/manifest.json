@@ -5,14 +5,11 @@
   "version": "1.0",
   "permissions": ["tabs", "activeTab", "scripting", "storage"],
   "host_permissions": [
-    "http://127.0.0.1:5000/*",
-    "http://*/*",
-    "https://*/*"
+    "http://127.0.0.1:5000/*"
   ],
   "background": {
-  "service_worker": "background.js"
-    },
-
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "index.html",
     "default_icon": {
@@ -29,5 +26,4 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }
-  
 }
