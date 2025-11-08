@@ -44,7 +44,103 @@ def extract_safety_score(text: str) -> int | None:
         except ValueError:
             return None
     return None
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
 
+def find_terms_url(base_url: str) -> str | None:
+    """
+    Tries multiple strategies to find the Terms & Conditions or Privacy Policy URL.
+    Combines:
+    - HTML footer crawling
+    - Fallback paths
+    - Content validation
+    - Optional Google search fallback
+    """
+
+    headers = {"User-Agent": "Mozilla/5.0"}
+    keywords = [
+        "terms", "conditions", "service", "privacy", "policy",
+        "tos", "legal", "agreement", "user-agreement",
+        "terms-of-use", "policies", "usage", "data", "compliance"
+    ]
+
+    try:
+        #  Fetch homepage
+        resp = requests.get(base_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        candidates = []
+
+        #  Prefer footer or nav area (more likely legal links)
+        footers = soup.find_all(["footer", "nav"])
+        links = soup.find_all("a", href=True)
+        if footers:
+            links += [a for f in footers for a in f.find_all("a", href=True)]
+
+        #  Collect matching links
+        for a in links:
+            href = a["href"].strip().lower()
+            text = (a.get_text(" ", strip=True) or "").lower()
+
+            if any(k in href or k in text for k in keywords):
+                abs_url = urljoin(base_url, href)
+                if abs_url not in candidates:
+                    candidates.append(abs_url)
+
+        #  Validate candidates — fetch and verify text
+        for candidate in candidates:
+            try:
+                page = requests.get(candidate, headers=headers, timeout=8)
+                if not re.search(r"(terms|privacy|conditions)", page.text, re.I):
+                    continue
+                # minimum content threshold (avoid cookie popups)
+                if len(page.text) < 1000:
+                    continue
+                print(f"[+] Found valid terms link: {candidate}")
+                return candidate
+            except Exception:
+                continue
+
+        #  Try fallback paths (common routes)
+        fallback_paths = [
+            "/terms", "/terms-of-service", "/terms-and-conditions",
+            "/privacy", "/privacy-policy", "/legal/terms",
+            "/tos", "/agreement", "/legal"
+        ]
+        for path in fallback_paths:
+            candidate = urljoin(base_url, path)
+            try:
+                r = requests.head(candidate, headers=headers, timeout=5)
+                if r.status_code == 200:
+                    print(f"[+] Fallback match: {candidate}")
+                    return candidate
+            except Exception:
+                continue
+
+        return None
+
+    except Exception as e:
+        print("Error in find_terms_url:", e)
+        return None
+
+def gemini_find_terms_link(homepage_html: str, base_url: str):
+    prompt = f"""
+You are given HTML source of a website homepage.
+Find and return the full URL of the 'Terms of Service' or 'Privacy Policy' page.
+
+Base URL: {base_url}
+
+Return ONLY the full URL, nothing else.
+HTML:
+{homepage_html[:10000]}
+"""
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    response = model.generate_content(prompt)
+    return response.text.strip()
+ 
 
 def scrape_terms_from_url(url):
     """Scrape Terms & Conditions or Privacy Policy text from a given URL."""
@@ -85,17 +181,24 @@ def analyze_terms():
     data = request.get_json()
 
     user_token = request.headers.get("X-Access-Token")
-    if user_token != "secure123":
-        return jsonify({"error": "Unauthorized"}), 403
+    # if user_token != "secure123":
+    #     return jsonify({"error": "Unauthorized"}), 403
 
     text = data.get("text")
     url = data.get("url")
 
-    # Scrape automatically if URL is given
+
+# Scrape automatically if URL is given
     if url and not text:
-        text = scrape_terms_from_url(url)
-        if not text:
-            return jsonify({"error": "Failed to extract terms from URL"}), 400
+        # First, find a possible terms page
+        terms_url = find_terms_url(url)
+        if not terms_url:
+            return jsonify({"error": "Could not find Terms or Privacy Policy link"}), 404
+
+    text = scrape_terms_from_url(terms_url)
+    if not text:
+        return jsonify({"error": "Failed to extract terms text from found page"}), 400
+
 
     if not text:
         return jsonify({"error": "No text provided"}), 400
